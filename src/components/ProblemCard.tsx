@@ -1,38 +1,36 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Users, ChevronRight } from 'lucide-react'
+import { db } from '../firebase'
+import { collection, getDocs } from 'firebase/firestore'
+
 type GroupChat = {
   name: string
   members?: number
-  onJoin: () => void
 }
-type ProblemCardProps = {
+
+type Problem = {
+  id: string
   title: string
   rating: number
-  difficulty?: string
+  difficulty: string
   groupChats: GroupChat[]
-  onCreateGroup: () => void
 }
-export const ProblemCard: React.FC<ProblemCardProps> = ({
-  title,
-  rating,
-  difficulty = 'Medium',
-  groupChats,
-  onCreateGroup,
-}) => {
-  // Determine difficulty color
-  const difficultyColor =
-    difficulty === 'Easy'
-      ? 'text-green-500'
-      : difficulty === 'Medium'
-        ? 'text-yellow-600'
-        : 'text-red-500'
+
+const difficultyColor = (difficulty: string) =>
+  difficulty === 'Easy'
+    ? 'text-green-500'
+    : difficulty === 'Medium'
+    ? 'text-yellow-600'
+    : 'text-red-500'
+
+const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       <div className="p-5">
         <div className="flex justify-between items-start mb-4">
           <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
           <div className="flex items-center">
-            <span className={`text-sm font-medium ${difficultyColor} mr-2`}>
+            <span className={`text-sm font-medium ${difficultyColor(difficulty)} mr-2`}>
               {difficulty}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -61,10 +59,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
                     </div>
                   )}
                 </div>
-                <button
-                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  onClick={chat.onJoin}
-                >
+                <button className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
                   Join
                   <ChevronRight size={16} className="ml-1" />
                 </button>
@@ -73,12 +68,6 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
           </div>
         </div>
         <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-          <button
-            className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
-            onClick={onCreateGroup}
-          >
-            <span className="mr-1">+</span> Create Group
-          </button>
           <div className="flex items-center">
             <span className="text-xs text-gray-500">Rating:</span>
             <span className="ml-1 text-sm text-gray-800 font-semibold">
@@ -87,6 +76,40 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+export const ProblemCardList: React.FC = () => {
+  const [problems, setProblems] = useState<Problem[]>([])
+
+  useEffect(() => {
+    const fetchProblems = async () => {
+      const querySnapshot = await getDocs(collection(db, 'problemCards'))
+      const loadedProblems: Problem[] = []
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        loadedProblems.push({
+          id: doc.id,
+          title: data.title,
+          rating: data.rating,
+          difficulty: data.difficulty,
+          groupChats: data.groupChats || [],
+        })
+      })
+
+      setProblems(loadedProblems)
+    }
+
+    fetchProblems()
+  }, [])
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+      {problems.map((problem) => (
+        <ProblemCard key={problem.id} {...problem} />
+      ))}
     </div>
   )
 }
