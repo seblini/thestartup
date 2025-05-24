@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { Users, ChevronRight } from 'lucide-react'
 import { db } from '../firebase'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore'
+
 
 type GroupChat = {
   name: string
   members?: number
+  onJoin: () => void
 }
 
 type Problem = {
@@ -14,6 +16,7 @@ type Problem = {
   rating: number
   difficulty: string
   groupChats: GroupChat[]
+  onCreateGroup: () => void
 }
 
 const difficultyColor = (difficulty: string) =>
@@ -23,7 +26,8 @@ const difficultyColor = (difficulty: string) =>
     ? 'text-yellow-600'
     : 'text-red-500'
 
-const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats }) => {
+
+const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats, onCreateGroup }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       <div className="p-5">
@@ -33,11 +37,9 @@ const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats 
             <span className={`text-sm font-medium ${difficultyColor(difficulty)} mr-2`}>
               {difficulty}
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {rating}
-            </span>
           </div>
         </div>
+
         <div className="mb-4">
           <h3 className="text-sm font-medium text-gray-700 mb-2">
             Active Group Chats
@@ -59,7 +61,10 @@ const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats 
                     </div>
                   )}
                 </div>
-                <button className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
+                <button
+                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  onClick={chat.onJoin}
+                >
                   Join
                   <ChevronRight size={16} className="ml-1" />
                 </button>
@@ -67,11 +72,20 @@ const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats 
             ))}
           </div>
         </div>
-        <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+
+        <div className="flex justify-between items-center">
+          <div>
+            <button
+              onClick={onCreateGroup}
+              className="px-2 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Create Group
+            </button>
+          </div>
           <div className="flex items-center">
             <span className="text-xs text-gray-500">Rating:</span>
             <span className="ml-1 text-sm text-gray-800 font-semibold">
-              {rating}
+              {rating} <span role="img" aria-label="fire">🔥</span>
             </span>
           </div>
         </div>
@@ -79,6 +93,7 @@ const ProblemCard: React.FC<Problem> = ({ title, rating, difficulty, groupChats 
     </div>
   )
 }
+
 
 export const ProblemCardList: React.FC = () => {
   const [problems, setProblems] = useState<Problem[]>([])
@@ -88,14 +103,44 @@ export const ProblemCardList: React.FC = () => {
       const querySnapshot = await getDocs(collection(db, 'problemCards'))
       const loadedProblems: Problem[] = []
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data()
+        const problemId = docSnap.id
+        const currentGroupChats = data.groupChats || []
+
         loadedProblems.push({
-          id: doc.id,
+          id: problemId,
           title: data.title,
           rating: data.rating,
           difficulty: data.difficulty,
-          groupChats: data.groupChats || [],
+          groupChats: currentGroupChats.map((chat: any) => ({
+            name: chat.name,
+            members: chat.members || 0,
+            onJoin: () => alert(`Joining ${chat.name}`),
+          })),
+          onCreateGroup: async () => {
+            const name = prompt("Enter group name:")
+            if (!name) return
+          
+            const membersStr = prompt("Enter number of members:")
+            if (!membersStr) return
+          
+            const members = parseInt(membersStr.trim(), 10)
+            if (isNaN(members)) {
+              alert("Invalid number of members.")
+              return
+            }
+          
+            const newGroup = { name: name.trim(), members }
+            const updatedGroupChats = [...currentGroupChats, newGroup]
+            const problemRef = doc(db, 'problemCards', problemId)
+          
+            await updateDoc(problemRef, { groupChats: updatedGroupChats })
+          
+            alert(`Created "${name}" with ${members} members.`)
+            fetchProblems()
+          }
+          
         })
       })
 
